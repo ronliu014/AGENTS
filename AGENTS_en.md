@@ -1,162 +1,171 @@
-# Repository Guidelines
-- Repo: https://github.com/moltbot/moltbot
-- GitHub issues/comments/PR comments: use literal multiline strings or `-F - <<'EOF'` (or $'...') for real newlines; never embed "\\n".
+# Python Project Guidelines
+## Repository Guidelines
+- Repo: Example `https://github.com/your-org/your-python-project` (replace with the actual repository URL)
+- GitHub issues/comments/PR comments: Use literal multiline strings or `-F - <<'EOF'` (or `$'...'`) for real line breaks; never embed `\\n`.
 
 ## Project Structure & Module Organization
-- Source code: `src/` (CLI wiring in `src/cli`, commands in `src/commands`, web provider in `src/provider-web.ts`, infra in `src/infra`, media pipeline in `src/media`).
-- Tests: colocated `*.test.ts`.
-- Docs: `docs/` (images, queue, Pi config). Built output lives in `dist/`.
-- Plugins/extensions: live under `extensions/*` (workspace packages). Keep plugin-only deps in the extension `package.json`; do not add them to the root `package.json` unless core uses them.
-- Plugins: install runs `npm install --omit=dev` in plugin dir; runtime deps must live in `dependencies`. Avoid `workspace:*` in `dependencies` (npm install breaks); put `moltbot` in `devDependencies` or `peerDependencies` instead (runtime resolves `clawdbot/plugin-sdk` via jiti alias).
-- Installers served from `https://molt.bot/*`: live in the sibling repo `../molt.bot` (`public/install.sh`, `public/install-cli.sh`, `public/install.ps1`).
-- Messaging channels: always consider **all** built-in + extension channels when refactoring shared logic (routing, allowlists, pairing, command gating, onboarding, docs).
-  - Core channel docs: `docs/channels/`
-  - Core channel code: `src/telegram`, `src/discord`, `src/slack`, `src/signal`, `src/imessage`, `src/web` (WhatsApp web), `src/channels`, `src/routing`
-  - Extensions (channel plugins): `extensions/*` (e.g. `extensions/msteams`, `extensions/matrix`, `extensions/zalo`, `extensions/zalouser`, `extensions/voice-call`)
-- When adding channels/extensions/apps/docs, review `.github/labeler.yml` for label coverage.
+- Source code: `src/` (CLI logic in `src/cli`, command implementations in `src/commands`, web services in `src/web`, infrastructure code in `src/infra`, data processing pipelines in `src/pipelines`).
+- Tests: Co-located `test_*.py` (follow pytest conventions); end-to-end tests are uniformly placed in `tests/e2e/` (if differentiation is needed).
+- Docs: `docs/` (including images, queue descriptions, deployment configurations, etc.). Built documentation output is in `docs/_build/` (Sphinx build artifacts).
+- Plugins/extensions: Placed in `extensions/*` (as installable subpackages). Plugin-specific dependencies are only in the `pyproject.toml`/`requirements.txt` of the plugin directory; do not add them to the root dependency files unless required by core code.
+- Plugins: Run `pip install --no-dev .` in the plugin directory during installation; runtime dependencies must be in `install_requires` (setup.cfg/poetry). Avoid `editable` installation in runtime dependencies (pip may fail to parse); place core packages in `dev-dependencies` or `peer-dependencies` (supported by poetry), and resolve the plugin SDK via `importlib` aliases at runtime.
+- Installers distribution path: If installation scripts are required, place them in `public/install.sh`/`public/install.ps1` (maintained in the sibling repo `../your-installer-repo`).
+- Functional module extension: When refactoring shared logic (routing, allowlists, command permissions, onboarding processes, documentation), consider all built-in + extension modules (e.g., `extensions/msteams`, `extensions/matrix`, `extensions/voice`, etc.).
+  - Core module docs: `docs/modules/`
+  - Core module code: `src/telegram`, `src/discord`, `src/web` (FastAPI/Flask), `src/routing`, `src/channels`
+  - Extension modules (plugins): `extensions/*`
+- When adding new modules/extensions/docs, check `.github/labeler.yml` to ensure full label coverage.
 
-## Docs Linking (Mintlify)
-- Docs are hosted on Mintlify (docs.molt.bot).
-- Internal doc links in `docs/**/*.md`: root-relative, no `.md`/`.mdx` (example: `[Config](/configuration)`).
-- Section cross-references: use anchors on root-relative paths (example: `[Hooks](/configuration#hooks)`).
-- Doc headings and anchors: avoid em dashes and apostrophes in headings because they break Mintlify anchor links.
-- When Peter asks for links, reply with full `https://docs.molt.bot/...` URLs (not root-relative).
-- README (GitHub): keep absolute docs URLs (`https://docs.molt.bot/...`) so links work on GitHub.
-- Docs content must be generic: no personal device names/hostnames/paths; use placeholders like `user@gateway-host` and “gateway host”.
+## Docs Linking (Sphinx/MkDocs)
+- Docs hosting: Example based on MkDocs (`docs.your-project.com`) or Read the Docs (`your-project.readthedocs.io`).
+- Internal doc links (in `docs/**/*.md`/`.rst`): Root-relative paths without `.md`/`.rst` suffixes (example: `[Config](/configuration)`).
+- Section cross-references: Root-relative paths + anchors (example: `[Hooks](/configuration#hooks)`).
+- Doc headings & anchors: Avoid em dashes and apostrophes in headings to prevent broken anchor links in MkDocs/Read the Docs.
+- When full links are required: Return the complete `https://docs.your-project.com/...` (instead of root-relative paths).
+- README (GitHub): Keep absolute doc URLs (`https://docs.your-project.com/...`) to ensure links work properly on GitHub.
+- Doc content guidelines: Generalize content without personal device/hostname/path references; use placeholders such as `user@deploy-host` and "deployment host".
 
-## exe.dev VM ops (general)
-- Access: stable path is `ssh exe.dev` then `ssh vm-name` (assume SSH key already set).
-- SSH flaky: use exe.dev web terminal or Shelley (web agent); keep a tmux session for long ops.
-- Update: `sudo npm i -g moltbot@latest` (global install needs root on `/usr/lib/node_modules`).
-- Config: use `moltbot config set ...`; ensure `gateway.mode=local` is set.
-- Discord: store raw token only (no `DISCORD_BOT_TOKEN=` prefix).
-- Restart: stop old gateway and run:
-  `pkill -9 -f moltbot-gateway || true; nohup moltbot gateway run --bind loopback --port 18789 --force > /tmp/moltbot-gateway.log 2>&1 &`
-- Verify: `moltbot channels status --probe`, `ss -ltnp | rg 18789`, `tail -n 120 /tmp/moltbot-gateway.log`.
+## Deployment Host/VM Operations (General)
+- Access method: Stable path `ssh deploy-host` then `ssh vm-name` (assuming SSH keys are configured).
+- Unstable SSH: Use the deployment host's web terminal; keep a tmux session for long-term operations.
+- Version update: `sudo pip install your-project@latest` (global installation requires write permission for `/usr/lib/python3/site-packages`); venv isolation is recommended: `source /opt/your-project/venv/bin/activate && pip install your-project@latest`.
+- Configuration management: Use `your-project config set ...` (custom CLI) or modify the `.env` file directly; ensure `deploy.mode=local` is configured.
+- Third-party keys (e.g., Discord): Store only the raw Token (without the `DISCORD_BOT_TOKEN=` prefix).
+- Service restart (managed by systemd):
+  ```bash
+  sudo systemctl stop your-project-gateway || true
+  sudo systemctl start your-project-gateway
+  # Without systemd:
+  pkill -9 -f your-project-gateway || true; nohup python -m src.gateway run --bind loopback --port 18789 --force > /tmp/your-project.log 2>&1 &
+  ```
+- Status verification:
+  ```bash
+  your-project status --probe
+  ss -ltnp | rg 18789
+  tail -n 120 /tmp/your-project.log
+  ```
 
 ## Build, Test, and Development Commands
-- Runtime baseline: Node **22+** (keep Node + Bun paths working).
-- Install deps: `pnpm install`
-- Pre-commit hooks: `prek install` (runs same checks as CI)
-- Also supported: `bun install` (keep `pnpm-lock.yaml` + Bun patching in sync when touching deps/patches).
-- Prefer Bun for TypeScript execution (scripts, dev, tests): `bun <file.ts>` / `bunx <tool>`.
-- Run CLI in dev: `pnpm moltbot ...` (bun) or `pnpm dev`.
-- Node remains supported for running built output (`dist/*`) and production installs.
-- Mac packaging (dev): `scripts/package-mac-app.sh` defaults to current arch. Release checklist: `docs/platforms/mac/release.md`.
-- Type-check/build: `pnpm build` (tsc)
-- Lint/format: `pnpm lint` (oxlint), `pnpm format` (oxfmt)
-- Tests: `pnpm test` (vitest); coverage: `pnpm test:coverage`
+- Runtime baseline: Python **3.10+** (compatible with 3.11/3.12, maintain venv/conda environment adaptability).
+- Dependency installation:
+  - Preferred: Poetry: `poetry install`
+  - Pip compatible: `pip install -r requirements-dev.txt`
+  - Pipenv also supported: `pipenv install --dev`
+- Pre-commit hooks: `pre-commit install` (runs the same checks as CI, e.g., black/isort/flake8).
+- Run dev version CLI:
+  - Poetry: `poetry run your-project ...`
+  - Venv: `source venv/bin/activate && python -m src.cli ...`
+- Packaging & building:
+  - Source distribution/Wheel: `poetry build` or `python -m build`
+  - Desktop app packaging (if needed): `pyinstaller src/main.spec` (Mac/Linux/Windows)
+- Type checking: `mypy src/` (enable strict mode with `strict = true`).
+- Code formatting/checking:
+  - Formatting: `black src/ tests/` + `isort src/ tests/`
+  - Static checking: `flake8 src/ tests/ --max-line-length=120`
+- Test execution: `pytest` (coverage: `pytest --cov=src --cov-report=term --cov-fail-under=70`).
 
 ## Coding Style & Naming Conventions
-- Language: TypeScript (ESM). Prefer strict typing; avoid `any`.
-- Formatting/linting via Oxlint and Oxfmt; run `pnpm lint` before commits.
-- Add brief code comments for tricky or non-obvious logic.
-- Keep files concise; extract helpers instead of “V2” copies. Use existing patterns for CLI options and dependency injection via `createDefaultDeps`.
-- Aim to keep files under ~700 LOC; guideline only (not a hard guardrail). Split/refactor when it improves clarity or testability.
-- Naming: use **Moltbot** for product/app/docs headings; use `moltbot` for CLI command, package/binary, paths, and config keys.
+- Language standard: Python 3.10+ (mandatory type hints, avoid `Any`; use `typing`/`typing_extensions` for complex types).
+- Formatting/checking: Based on Black + Isort + Flake8; must run `pre-commit run --all-files` before submission.
+- Code comments: Add concise comments for complex/non-intuitive logic; add docstrings for key functions/classes (follow Google or NumPy style).
+- File guidelines: Keep files concise, extract helper functions instead of copying and pasting "V2 version" code; reuse existing patterns for CLI options and dependency injection.
+- File line count: Target a single file with less than ~700 lines of code (guideline only); refactor immediately if splitting improves readability/testability.
+- Naming rules:
+  - Product/doc headings: Use **YourProject** (full project name).
+  - CLI commands/package names/paths/config keys: Use `your-project` (lowercase hyphen) or `your_project` (lowercase underscore, compliant with Python package standards).
+  - In-code naming: Follow PEP8 — variables/functions use `snake_case`, classes use `CamelCase`, constants use `UPPER_SNAKE_CASE`.
 
 ## Release Channels (Naming)
-- stable: tagged releases only (e.g. `vYYYY.M.D`), npm dist-tag `latest`.
-- beta: prerelease tags `vYYYY.M.D-beta.N`, npm dist-tag `beta` (may ship without macOS app).
-- dev: moving head on `main` (no tag; git checkout main).
+- stable: Tagged releases only (example `vYYYY.M.D`), PyPI tag `latest`.
+- beta: Pre-release tags `vYYYY.M.D-beta.N`, PyPI tag `beta` (desktop packaging artifacts may be omitted temporarily).
+- dev: Latest commits on the `main` branch (no tag; check out the main branch directly for testing).
 
 ## Testing Guidelines
-- Framework: Vitest with V8 coverage thresholds (70% lines/branches/functions/statements).
-- Naming: match source names with `*.test.ts`; e2e in `*.e2e.test.ts`.
-- Run `pnpm test` (or `pnpm test:coverage`) before pushing when you touch logic.
-- Do not set test workers above 16; tried already.
-- Live tests (real keys): `CLAWDBOT_LIVE_TEST=1 pnpm test:live` (Moltbot-only) or `LIVE=1 pnpm test:live` (includes provider live tests). Docker: `pnpm test:docker:live-models`, `pnpm test:docker:live-gateway`. Onboarding Docker E2E: `pnpm test:docker:onboard`.
-- Full kit + what’s covered: `docs/testing.md`.
-- Pure test additions/fixes generally do **not** need a changelog entry unless they alter user-facing behavior or the user asks for one.
-- Mobile: before using a simulator, check for connected real devices (iOS + Android) and prefer them when available.
+- Test framework: pytest (coverage threshold 70% for lines/branches/functions/statements).
+- Naming conventions: Test files have the same name as the source code with the `test_*.py` suffix; end-to-end tests are labeled `*_e2e_test.py`.
+- Pre-submission check: After modifying business logic, must run `pytest` (or `pytest --cov`).
+- Test concurrency: Do not set the number of test worker threads above 16 (verified that excessive threads cause resource conflicts).
+- Real environment testing (including keys):
+  ```bash
+  LIVE_TEST=1 pytest tests/live/
+  # Docker environment testing:
+  docker-compose run test-service pytest tests/docker/
+  ```
+- Test documentation: Complete test coverage description is in `docs/testing.md`.
+- Changelog rules: Pure test additions/fixes do not require a Changelog entry unless they affect user-visible behavior or are explicitly requested by the user.
+- Mobile testing: Prefer real devices (iOS/Android) when available; use simulators only if no real devices are present.
 
 ## Commit & Pull Request Guidelines
-- Create commits with `scripts/committer "<msg>" <file...>`; avoid manual `git add`/`git commit` so staging stays scoped.
-- Follow concise, action-oriented commit messages (e.g., `CLI: add verbose flag to send`).
-- Group related changes; avoid bundling unrelated refactors.
-- Changelog workflow: keep latest released version at top (no `Unreleased`); after publishing, bump version and start a new top section.
-- PRs should summarize scope, note testing performed, and mention any user-facing changes or new flags.
-- PR review flow: when given a PR link, review via `gh pr view`/`gh pr diff` and do **not** change branches.
-- PR review calls: prefer a single `gh pr view --json ...` to batch metadata/comments; run `gh pr diff` only when needed.
-- Before starting a review when a GH Issue/PR is pasted: run `git pull`; if there are local changes or unpushed commits, stop and alert the user before reviewing.
-- Goal: merge PRs. Prefer **rebase** when commits are clean; **squash** when history is messy.
-- PR merge flow: create a temp branch from `main`, merge the PR branch into it (prefer squash unless commit history is important; use rebase/merge when it is). Always try to merge the PR unless it’s truly difficult, then use another approach. If we squash, add the PR author as a co-contributor. Apply fixes, add changelog entry (include PR # + thanks), run full gate before the final commit, commit, merge back to `main`, delete the temp branch, and end on `main`.
-- If you review a PR and later do work on it, land via merge/squash (no direct-main commits) and always add the PR author as a co-contributor.
-- When working on a PR: add a changelog entry with the PR number and thank the contributor.
-- When working on an issue: reference the issue in the changelog entry.
-- When merging a PR: leave a PR comment that explains exactly what we did and include the SHA hashes.
-- When merging a PR from a new contributor: add their avatar to the README “Thanks to all clawtributors” thumbnail list.
-- After merging a PR: run `bun scripts/update-clawtributors.ts` if the contributor is missing, then commit the regenerated README.
+- Submission standard: Use `cz commit` (Commitizen) or manually follow the Conventional Commits standard; avoid manual `git add`/`git commit` to ensure only relevant changes are in the staging area.
+- Commit messages: Concise and action-oriented (example: `CLI: add verbose flag to send command`).
+- Change grouping: Merge related changes into a single commit; avoid mixing unrelated refactoring into the same commit.
+- Changelog workflow: Keep the latest released version at the top (no `Unreleased` section); update the version number and create a new top section after release.
+- PR description: Summarize the scope of changes, test execution status, and note user-visible changes/new parameters.
+- PR review process:
+  - After receiving the PR link, review via `gh pr view`/`gh pr diff`; **do not switch branches** and **do not modify code**.
+  - Run `git pull` before review; if there are uncommitted local changes/conflicts, pause the review and inform the user.
+- PR merge target: Prioritize merging PRs; use **rebase** for clear commit history, and **squash** for messy history.
+- PR merge process:
+  1. Create a temporary branch from `main`.
+  2. Merge the PR branch into the temporary branch (prefer rebase to ensure linear history; allow merge for complex conflicts).
+  3. Fix issues and add Changelog entries (including PR number + contributor thanks).
+  4. Run full local checks (`pre-commit run --all-files && pytest`).
+  5. Commit and merge back to `main`, delete the temporary branch, and switch back to `main`.
+- Contributor attribution:
+  - If you modify the PR yourself after review, set the original author as a co-contributor when merging.
+  - After merging a PR from a new contributor, add their avatar to the "Contributors" section of the README.
+  - Run `python scripts/update-contributors.py` to automatically update the contributor list and submit the changes.
 
 ## Shorthand Commands
-- `sync`: if working tree is dirty, commit all changes (pick a sensible Conventional Commit message), then `git pull --rebase`; if rebase conflicts and cannot resolve, stop; otherwise `git push`.
+- `sync`: If the working directory has changes, commit all modifications (automatically generate compliant Conventional Commits messages), execute `git pull --rebase`; pause if rebase conflicts cannot be resolved; otherwise execute `git push`.
 
 ### PR Workflow (Review vs Land)
-- **Review mode (PR link only):** read `gh pr view/diff`; **do not** switch branches; **do not** change code.
-- **Landing mode:** create an integration branch from `main`, bring in PR commits (**prefer rebase** for linear history; **merge allowed** when complexity/conflicts make it safer), apply fixes, add changelog (+ thanks + PR #), run full gate **locally before committing** (`pnpm lint && pnpm build && pnpm test`), commit, merge back to `main`, then `git switch main` (never stay on a topic branch after landing). Important: contributor needs to be in git graph after this!
+- **Review mode (PR link only)**: Only read `gh pr view/diff`; **do not switch branches** and **do not modify code**.
+- **Landing mode**:
+  1. Create an integration branch from `main`.
+  2. Import PR commits (prefer rebase to ensure linear history; allow **merge** for complex conflicts).
+  3. Fix issues and supplement the Changelog (including thanks + PR number).
+  4. Run full local verification (`pre-commit run --all-files && pytest`).
+  5. Commit and merge back to `main`, execute `git switch main` (never stay on a feature branch after merging).
+  Key requirement: Contributor information must appear in the git commit history!
 
 ## Security & Configuration Tips
-- Web provider stores creds at `~/.clawdbot/credentials/`; rerun `moltbot login` if logged out.
-- Pi sessions live under `~/.clawdbot/sessions/` by default; the base directory is not configurable.
-- Environment variables: see `~/.profile`.
-- Never commit or publish real phone numbers, videos, or live configuration values. Use obviously fake placeholders in docs, tests, and examples.
- - Release flow: always read `docs/reference/RELEASING.md` and `docs/platforms/mac/release.md` before any release work; do not ask routine questions once those docs answer them.
+- Credential storage: Web service credentials are stored in `~/.your-project/credentials/`; re-run `your-project login` if logged out.
+- Session storage: Optional default session files are placed in `~/.your-project/sessions/`; the base directory is not configurable.
+- Environment variables: Loaded based on `python-dotenv`, configuration files are placed in `~/.profile` or the project root `.env` (**do not submit .env**).
+- Sensitive information: Never submit/publish real phone numbers, keys, or configuration values; use obvious fake data in docs/tests/examples (e.g., `user@example.com`, `fake-token-123456`).
+- Release process: Must read `docs/reference/RELEASING.md` before release; do not ask repetitive questions for routine issues covered in the documentation.
 
 ## Troubleshooting
-- Rebrand/migration issues or legacy config/service warnings: run `moltbot doctor` (see `docs/gateway/doctor.md`).
+- Migration/legacy configuration warnings: Execute `your-project doctor` (refer to `docs/gateway/doctor.md`).
+- Dependency conflicts: Execute `poetry lock --no-update` or `pip check` to troubleshoot; prefer using Poetry lock files to ensure environment consistency.
+- Type checking errors: Confirm that the `mypy` configuration (`[tool.mypy]` in `pyproject.toml`) matches the code annotations; use `TypeGuard`/`cast` to explicitly label complex types.
 
-## Agent-Specific Notes
-- Vocabulary: "makeup" = "mac app".
-- Never edit `node_modules` (global/Homebrew/npm/git installs too). Updates overwrite. Skill notes go in `tools.md` or `AGENTS.md`.
-- Signal: "update fly" => `fly ssh console -a flawd-bot -C "bash -lc 'cd /data/clawd/moltbot && git pull --rebase origin main'"` then `fly machines restart e825232f34d058 -a flawd-bot`.
-- When working on a GitHub Issue or PR, print the full URL at the end of the task.
-- When answering questions, respond with high-confidence answers only: verify in code; do not guess.
-- Never update the Carbon dependency.
-- Any dependency with `pnpm.patchedDependencies` must use an exact version (no `^`/`~`).
-- Patching dependencies (pnpm patches, overrides, or vendored changes) requires explicit approval; do not do this by default.
-- CLI progress: use `src/cli/progress.ts` (`osc-progress` + `@clack/prompts` spinner); don’t hand-roll spinners/bars.
-- Status output: keep tables + ANSI-safe wrapping (`src/terminal/table.ts`); `status --all` = read-only/pasteable, `status --deep` = probes.
-- Gateway currently runs only as the menubar app; there is no separate LaunchAgent/helper label installed. Restart via the Moltbot Mac app or `scripts/restart-mac.sh`; to verify/kill use `launchctl print gui/$UID | grep moltbot` rather than assuming a fixed label. **When debugging on macOS, start/stop the gateway via the app, not ad-hoc tmux sessions; kill any temporary tunnels before handoff.**
-- macOS logs: use `./scripts/clawlog.sh` to query unified logs for the Moltbot subsystem; it supports follow/tail/category filters and expects passwordless sudo for `/usr/bin/log`.
-- If shared guardrails are available locally, review them; otherwise follow this repo's guidance.
-- SwiftUI state management (iOS/macOS): prefer the `Observation` framework (`@Observable`, `@Bindable`) over `ObservableObject`/`@StateObject`; don’t introduce new `ObservableObject` unless required for compatibility, and migrate existing usages when touching related code.
-- Connection providers: when adding a new connection, update every UI surface and docs (macOS app, web UI, mobile if applicable, onboarding/overview docs) and add matching status + configuration forms so provider lists and settings stay in sync.
-- Version locations: `package.json` (CLI), `apps/android/app/build.gradle.kts` (versionName/versionCode), `apps/ios/Sources/Info.plist` + `apps/ios/Tests/Info.plist` (CFBundleShortVersionString/CFBundleVersion), `apps/macos/Sources/Moltbot/Resources/Info.plist` (CFBundleShortVersionString/CFBundleVersion), `docs/install/updating.md` (pinned npm version), `docs/platforms/mac/release.md` (APP_VERSION/APP_BUILD examples), Peekaboo Xcode projects/Info.plists (MARKETING_VERSION/CURRENT_PROJECT_VERSION).
-- **Restart apps:** “restart iOS/Android apps” means rebuild (recompile/install) and relaunch, not just kill/launch.
-- **Device checks:** before testing, verify connected real devices (iOS/Android) before reaching for simulators/emulators.
-- iOS Team ID lookup: `security find-identity -p codesigning -v` → use Apple Development (…) TEAMID. Fallback: `defaults read com.apple.dt.Xcode IDEProvisioningTeamIdentifiers`.
-- A2UI bundle hash: `src/canvas-host/a2ui/.bundle.hash` is auto-generated; ignore unexpected changes, and only regenerate via `pnpm canvas:a2ui:bundle` (or `scripts/bundle-a2ui.sh`) when needed. Commit the hash as a separate commit.
-- Release signing/notary keys are managed outside the repo; follow internal release docs.
-- Notary auth env vars (`APP_STORE_CONNECT_ISSUER_ID`, `APP_STORE_CONNECT_KEY_ID`, `APP_STORE_CONNECT_API_KEY_P8`) are expected in your environment (per internal release docs).
-- **Multi-agent safety:** do **not** create/apply/drop `git stash` entries unless explicitly requested (this includes `git pull --rebase --autostash`). Assume other agents may be working; keep unrelated WIP untouched and avoid cross-cutting state changes.
-- **Multi-agent safety:** when the user says "push", you may `git pull --rebase` to integrate latest changes (never discard other agents' work). When the user says "commit", scope to your changes only. When the user says "commit all", commit everything in grouped chunks.
-- **Multi-agent safety:** do **not** create/remove/modify `git worktree` checkouts (or edit `.worktrees/*`) unless explicitly requested.
-- **Multi-agent safety:** do **not** switch branches / check out a different branch unless explicitly requested.
-- **Multi-agent safety:** running multiple agents is OK as long as each agent has its own session.
-- **Multi-agent safety:** when you see unrecognized files, keep going; focus on your changes and commit only those.
-- Lint/format churn:
-  - If staged+unstaged diffs are formatting-only, auto-resolve without asking.
-  - If commit/push already requested, auto-stage and include formatting-only follow-ups in the same commit (or a tiny follow-up commit if needed), no extra confirmation.
-  - Only ask when changes are semantic (logic/data/behavior).
-- Lobster seam: use the shared CLI palette in `src/terminal/palette.ts` (no hardcoded colors); apply palette to onboarding/config prompts and other TTY UI output as needed.
-- **Multi-agent safety:** focus reports on your edits; avoid guard-rail disclaimers unless truly blocked; when multiple agents touch the same file, continue if safe; end with a brief “other files present” note only if relevant.
-- Bug investigations: read source code of relevant npm dependencies and all related local code before concluding; aim for high-confidence root cause.
-- Code style: add brief comments for tricky logic; keep files under ~500 LOC when feasible (split/refactor as needed).
-- Tool schema guardrails (google-antigravity): avoid `Type.Union` in tool input schemas; no `anyOf`/`oneOf`/`allOf`. Use `stringEnum`/`optionalStringEnum` (Type.Unsafe enum) for string lists, and `Type.Optional(...)` instead of `... | null`. Keep top-level tool schema as `type: "object"` with `properties`.
-- Tool schema guardrails: avoid raw `format` property names in tool schemas; some validators treat `format` as a reserved keyword and reject the schema.
-- When asked to open a “session” file, open the Pi session logs under `~/.clawdbot/agents/<agentId>/sessions/*.jsonl` (use the `agent=<id>` value in the Runtime line of the system prompt; newest unless a specific ID is given), not the default `sessions.json`. If logs are needed from another machine, SSH via Tailscale and read the same path there.
-- Do not rebuild the macOS app over SSH; rebuilds must be run directly on the Mac.
-- Never send streaming/partial replies to external messaging surfaces (WhatsApp, Telegram); only final replies should be delivered there. Streaming/tool events may still go to internal UIs/control channel.
-- Voice wake forwarding tips:
-  - Command template should stay `moltbot-mac agent --message "${text}" --thinking low`; `VoiceWakeForwarder` already shell-escapes `${text}`. Don’t add extra quotes.
-  - launchd PATH is minimal; ensure the app’s launch agent PATH includes standard system paths plus your pnpm bin (typically `$HOME/Library/pnpm`) so `pnpm`/`moltbot` binaries resolve when invoked via `moltbot-mac`.
-- For manual `moltbot message send` messages that include `!`, use the heredoc pattern noted below to avoid the Bash tool’s escaping.
-- Release guardrails: do not change version numbers without operator’s explicit consent; always ask permission before running any npm publish/release step.
-
-## NPM + 1Password (publish/verify)
-- Use the 1password skill; all `op` commands must run inside a fresh tmux session.
-- Sign in: `eval "$(op signin --account my.1password.com)"` (app unlocked + integration on).
-- OTP: `op read 'op://Private/Npmjs/one-time password?attribute=otp'`.
-- Publish: `npm publish --access public --otp="<otp>"` (run from the package dir).
-- Verify without local npmrc side effects: `npm view <pkg> version --userconfig "$(mktemp)"`.
-- Kill the tmux session after publish.
+## Project-Specific Notes
+- Packaging notes: "mac app" refers to the macOS desktop app packaged based on PyQt/Tkinter.
+- Dependency modification: **Never edit the `site-packages` directory directly** (for global/venv/conda installations); implement modifications via fork + patches if needed, and record patches in `patches/`.
+- PyPI release:
+  - Must execute `twine` release commands in a fresh tmux session.
+  - Login authentication: `twine login --repository pypi` (use API Token).
+  - Release: `twine upload dist/*`.
+  - Verification: `pip install your-project==<version> --userconfig $(mktemp)`.
+  - Close the tmux session after release.
+- Configuration verification: Use `pydantic` to verify configuration files/environment variables to avoid runtime configuration errors.
+- Logging standards: Uniquely use the `logging` module (instead of `print`); log level/format configuration is in `src/logging.py`.
+- Multi-developer collaboration security:
+  - Do not create/apply/delete `git stash` entries unless explicitly requested (including `git pull --rebase --autostash`).
+  - Execute `git pull --rebase` to integrate the latest changes before `push` (**never discard others' work**).
+  - Only submit your own changes when executing `commit`; group commits by logic when using `commit all`.
+  - Do not create/delete/modify `git worktree`; do not switch branches unless explicitly requested.
+- Formatting change handling:
+  - If staged/unstaged changes are only formatting modifications, resolve them automatically without confirmation.
+  - If `commit/push` is already requested, automatically stage formatting modifications and merge them into the same commit (a separate small commit if necessary), no additional confirmation required.
+  - Only confirm with the user when changes involve business logic (data/behavior).
+- Version number locations:
+  - `pyproject.toml` (Poetry)/`setup.cfg` (setuptools): Core version number.
+  - `apps/android/build.gradle.kts`: `versionName`/`versionCode` (if mobile support is available).
+  - `apps/ios/Info.plist`: `CFBundleShortVersionString`/`CFBundleVersion` (if iOS app is available).
+  - `docs/install/updating.md`: Pinned PyPI version number.
+- App restart: "Restart iOS/Android apps" means recompile, install and restart, not just kill the process.
+- Device check: Prior to testing, verify connected real devices (iOS/Android) first, then consider simulators.
+- Release permission: **Never modify the version number without explicit authorization**; must obtain clear permission before executing PyPI release operations.
